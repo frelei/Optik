@@ -63,6 +63,8 @@ internal final class AlbumViewController: UIViewController {
     private var activityIndicatorColor: UIColor?
     private var dismissButtonImage: UIImage?
     private var dismissButtonPosition: DismissButtonPosition
+    fileprivate var pageControl: UIPageControl?
+    
     
     private var cachedRemoteImages: [URL: UIImage] = [:]
     private var viewDidAppear: Bool = false
@@ -75,7 +77,8 @@ internal final class AlbumViewController: UIViewController {
          initialImageDisplayIndex: Int,
          activityIndicatorColor: UIColor?,
          dismissButtonImage: UIImage?,
-         dismissButtonPosition: DismissButtonPosition) {
+         dismissButtonPosition: DismissButtonPosition,
+         actionButtonPosition: ActionButtonPosition) {
         
         self.imageData = imageData
         self.initialImageDisplayIndex = initialImageDisplayIndex
@@ -84,9 +87,10 @@ internal final class AlbumViewController: UIViewController {
         self.dismissButtonPosition = dismissButtonPosition
         
         pageViewController = UIPageViewController(transitionStyle: .scroll,
-                                                  navigationOrientation: .horizontal,
+                                                  navigationOrientation: .vertical,
                                                   options: [UIPageViewControllerOptionInterPageSpacingKey : Constants.SpacingBetweenImages])
-
+        
+        pageControl = UIPageControl()
         super.init(nibName: nil, bundle: nil)
         
         setupPageViewController()
@@ -113,8 +117,10 @@ internal final class AlbumViewController: UIViewController {
             
             UIView.animate(withDuration: Constants.TransitionAnimationDuration, animations: {
                 self.setNeedsStatusBarAppearanceUpdate()
-            }) 
+            })
         }
+        
+        updateActionButtonImage(at: initialImageDisplayIndex)
     }
     
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -122,7 +128,7 @@ internal final class AlbumViewController: UIViewController {
         
         coordinator.animate(alongsideTransition: { (_) in
             self.pageViewController.view.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
-            }, completion: nil)
+        }, completion: nil)
     }
     
     override var prefersStatusBarHidden : Bool {
@@ -147,7 +153,55 @@ internal final class AlbumViewController: UIViewController {
         didMove(toParentViewController: pageViewController)
         
         setupDismissButton()
+        setupPageControl()
         setupPanGestureRecognizer()
+    }
+    
+    private func setupPageControl() {
+        
+        pageControl?.currentPage = 0
+        pageControl?.pageIndicatorTintColor = UIColor.red
+        pageControl?.translatesAutoresizingMaskIntoConstraints = false
+        pageControl?.transform = CGAffineTransform(rotationAngle: CGFloat(M_PI/2))
+        view.addSubview(pageControl!)
+
+        view.addConstraint(
+            NSLayoutConstraint(item: pageControl,
+                               attribute: .trailing,
+                               relatedBy: .equal,
+                               toItem: view,
+                               attribute: .trailing,
+                               multiplier: 1,
+                               constant: -10)
+        )
+        view.addConstraint(
+            NSLayoutConstraint(item: pageControl,
+                               attribute: .centerY,
+                               relatedBy: .equal,
+                               toItem: view,
+                               attribute: .centerY,
+                               multiplier: 1,
+                               constant: 0)
+        )
+        view.addConstraint(
+            NSLayoutConstraint(item: pageControl,
+                               attribute: .width,
+                               relatedBy: .equal,
+                               toItem: nil,
+                               attribute: .notAnAttribute,
+                               multiplier: 1,
+                               constant: 30)
+        )
+        view.addConstraint(
+            NSLayoutConstraint(item: pageControl,
+                               attribute: .height,
+                               relatedBy: .equal,
+                               toItem: nil,
+                               attribute: .notAnAttribute,
+                               multiplier: 1,
+                               constant: 25)
+        )
+    
     }
     
     private func setupPageViewController() {
@@ -176,39 +230,39 @@ internal final class AlbumViewController: UIViewController {
         
         view.addConstraint(
             NSLayoutConstraint(item: dismissButton,
-                attribute: xAnchorAttribute,
-                relatedBy: .equal,
-                toItem: view,
-                attribute: xAnchorAttribute,
-                multiplier: 1,
-                constant: 0)
+                               attribute: xAnchorAttribute,
+                               relatedBy: .equal,
+                               toItem: view,
+                               attribute: xAnchorAttribute,
+                               multiplier: 1,
+                               constant: 0)
         )
         view.addConstraint(
             NSLayoutConstraint(item: dismissButton,
-                attribute: yAnchorAttribute,
-                relatedBy: .equal,
-                toItem: view,
-                attribute: yAnchorAttribute,
-                multiplier: 1,
-                constant: 0)
+                               attribute: yAnchorAttribute,
+                               relatedBy: .equal,
+                               toItem: view,
+                               attribute: yAnchorAttribute,
+                               multiplier: 1,
+                               constant: 0)
         )
         view.addConstraint(
             NSLayoutConstraint(item: dismissButton,
-                attribute: .width,
-                relatedBy: .equal,
-                toItem: nil,
-                attribute: .notAnAttribute,
-                multiplier: 1,
-                constant: Constants.DismissButtonDimension)
+                               attribute: .width,
+                               relatedBy: .equal,
+                               toItem: nil,
+                               attribute: .notAnAttribute,
+                               multiplier: 1,
+                               constant: Constants.DismissButtonDimension)
         )
         view.addConstraint(
             NSLayoutConstraint(item: dismissButton,
-                attribute: .height,
-                relatedBy: .equal,
-                toItem: nil,
-                attribute: .notAnAttribute,
-                multiplier: 1,
-                constant: Constants.DismissButtonDimension)
+                               attribute: .height,
+                               relatedBy: .equal,
+                               toItem: nil,
+                               attribute: .notAnAttribute,
+                               multiplier: 1,
+                               constant: Constants.DismissButtonDimension)
         )
     }
     
@@ -226,15 +280,21 @@ internal final class AlbumViewController: UIViewController {
                 return nil
             }
             
-            return ImageViewController(image: images[index], index: index)
+            pageControl?.numberOfPages = images.count
+            let imageViewController =  ImageViewController(image: images[index], index: index, actionButtonPosition: .bottomLeading)
+            imageViewController.actionButton?.addTarget(self, action: #selector(AlbumViewController.didSelectImage(_:)), for: .touchUpInside)
+            return imageViewController
+            
         case .remote(let urls, let imageDownloader):
             guard index >= 0 && index < urls.count else {
                 return nil
             }
             
-            let imageViewController = ImageViewController(activityIndicatorColor: activityIndicatorColor, index: index)
+            pageControl?.numberOfPages = urls.count
+            let imageViewController = ImageViewController(activityIndicatorColor: activityIndicatorColor, index: index, actionButtonPosition: .bottomLeading)
+            imageViewController.actionButton?.addTarget(self, action: #selector(AlbumViewController.didSelectImage(_:)), for: .touchUpInside)
+
             let url = urls[index]
-            
             if let image = cachedRemoteImages[url] {
                 imageViewController.image = image
             } else {
@@ -243,19 +303,35 @@ internal final class AlbumViewController: UIViewController {
                     
                     self?.cachedRemoteImages[url] = image
                     imageViewController.image = image
-                    })
+                })
             }
             
             return imageViewController
         }
     }
     
+    fileprivate func updateActionButtonImage(at index: Int) {
+        if let imageViewController = pageViewController.viewControllers?.first as? ImageViewController{
+            let actionButton = imageViewController.actionButton
+            let image = imageViewerDelegate?.imageForActionButton(at: index)
+            actionButton?.setImage(image, for: .normal)
+        }
+    }
+    
+    
+    // MARK: - IBACTIONS
     @objc private func didTapDismissButton(_ sender: UIButton) {
         dismiss(animated: true, completion: nil)
     }
     
     @objc private func didPan(_ sender: UIPanGestureRecognizer) {
         transitionController.didPan(withGestureRecognizer: sender, sourceView: view)
+    }
+    
+    @objc private func didSelectImage(_ sender: UIButton) {
+        if let currentImageIndex = currentImageViewController?.index {
+            imageViewerDelegate?.actionButtonTapped(button: sender, at: currentImageIndex)
+        }
     }
     
 }
@@ -271,7 +347,7 @@ extension AlbumViewController: UIPageViewControllerDataSource {
         guard let imageViewController = viewController as? ImageViewController else {
             return nil
         }
-        
+
         return self.imageViewController(forIndex: imageViewController.index - 1)
     }
     
@@ -280,6 +356,7 @@ extension AlbumViewController: UIPageViewControllerDataSource {
         guard let imageViewController = viewController as? ImageViewController else {
             return nil
         }
+
         
         return self.imageViewController(forIndex: imageViewController.index + 1)
     }
@@ -292,8 +369,8 @@ extension AlbumViewController: UIPageViewControllerDelegate {
     
     func pageViewController(_ pageViewController: UIPageViewController,
                             didFinishAnimating finished: Bool,
-                                               previousViewControllers: [UIViewController],
-                                               transitionCompleted completed: Bool) {
+                            previousViewControllers: [UIViewController],
+                            transitionCompleted completed: Bool) {
         guard completed == true else {
             return
         }
@@ -306,6 +383,8 @@ extension AlbumViewController: UIPageViewControllerDelegate {
         
         if let currentImageIndex = currentImageViewController?.index {
             imageViewerDelegate?.imageViewerDidDisplayImage(at: currentImageIndex)
+            pageControl?.currentPage = currentImageIndex
+            self.updateActionButtonImage(at: currentImageIndex)
         }
     }
     
